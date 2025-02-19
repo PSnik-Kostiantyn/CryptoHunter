@@ -10,11 +10,9 @@ data = pd.read_csv("../datasets/technical_indicators.csv")
 
 data = data.sort_values(by="Timestamp")
 
-# Додаємо більше лагів
 for lag in range(1, 11):
     data[f"Close_lag_{lag}"] = data["Close"].shift(lag)
 
-# Додаємо волатильність (стандартне відхилення за 10 періодів)
 data["Volatility_10"] = data["Close"].rolling(window=10).std()
 
 data = data.dropna()
@@ -31,7 +29,6 @@ X_scaled = scaler.fit_transform(X)
 
 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=False)
 
-# Покращена модель XGBoost
 model = xgb.XGBClassifier(
     n_estimators=500,
     learning_rate=0.01,
