@@ -7,6 +7,7 @@ def analyze_market_reaction(news_text):
     api_key="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",
   )
 
+
   while True:
       request = f"<important>Output only the number of the score.</important> Based on this news {news_text} analyze the reaction and provide a score from 0 to 1 where 0 is extremely negative for Bitcoin and 1 is extremely positive. <important>Output only the number</important>"
 
@@ -18,7 +19,6 @@ def analyze_market_reaction(news_text):
       )
 
       result = response.choices[0].message.content.strip()
-      print("We got result")
       if re.fullmatch(r"0(\.\d+)?|1(\.0+)?", result):
           return result
 
