@@ -1,0 +1,20 @@
+[project]
+name = "cryptohunter"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Denis Bobela",email = "youtipie@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "scrapy (>=2.12.0,<3.0.0)",
+    "openai (>=1.63.2,<2.0.0)",
+    "python-dotenv (>=1.0.1,<2.0.0)",
+    "scrapy-fake-useragent (>=1.4.4,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
