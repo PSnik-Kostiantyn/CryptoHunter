@@ -11,6 +11,10 @@ Install all dependencies using poetry:
     poetry install
 ```
 
+Specify environment variables:
+
+- **DEEPSEEK_TOKEN**: string containing openrouter token for DeepSeek model.
+
 To run spiders execute next command:
 
 ```bash
