@@ -2,16 +2,22 @@ import requests
 import re
 import json
 
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = "AIzaSyCmfYo2PTrYX9u7stQM2DNlIupoSSLxcsI"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-
 
 def analyze_market_reaction(news_text):
     request_payload = {
         "contents": [{
-            "parts": [{
-                "text": f"Output only the number of the score. Based on this news: {news_text} analyze the reaction and provide a score from 0 to 1 where 0 is extremely negative for Bitcoin and 1 is extremely positive. Output only the number."
-            }]
+            "parts": [{"text": (
+                    f"Output only the number of the score. Based on this news: {news_text} "
+                    "analyze the sentiment and provide a score from 0 to 1, where:\n"
+                    "0 means extremely, extremely negative,\n"
+                    "0.1 means very negative,\n"
+                    "0.9 means very positive, and 0.5 is neutral\n"
+                    "1 means extremely, extremely positive for Bitcoin growth.\n"
+                    "Any value between 0 and 1 is possible to capture the nuances of the sentiment. "
+                    "Output only the number."
+                )}]
         }]
     }
 
