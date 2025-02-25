@@ -7,11 +7,15 @@ import time
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 NEWS_FILE = "news.json"
 OUTPUT_CSV = "analyzed_news.csv"
-MAX_REQUESTS = 120
+MAX_REQUESTS = 400
 
 
 def load_news():
@@ -66,6 +70,7 @@ def analyze_market_reaction(news_text):
             return analyze_market_reaction(news_text)
     else:
         print("Error while getting news data")
+        print(response.text)
         return None
 
 
@@ -106,7 +111,10 @@ def process_news():
             if score is not None:
                 last_valid_score = score
             else:
-                score = last_valid_score
+                time.sleep(60)
+                print("_________________________________")
+                score = analyze_market_reaction(combined_text)
+                request_count += 1
         else:
             score = previous_hour_score
         previous_hour_score = score

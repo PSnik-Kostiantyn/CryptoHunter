@@ -1,9 +1,14 @@
+import os
 import requests
 import re
 import json
 
-GEMINI_API_KEY = "AIzaSyCmfYo2PTrYX9u7stQM2DNlIupoSSLxcsI"
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
 def analyze_market_reaction(news_text):
     request_payload = {
