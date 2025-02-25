@@ -2,14 +2,14 @@ import requests
 import json
 import csv
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 GEMINI_API_KEY = "AIzaSyCmfYo2PTrYX9u7stQM2DNlIupoSSLxcsI"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 NEWS_FILE = "news.json"
 OUTPUT_CSV = "analyzed_news.csv"
-MAX_REQUESTS = 12000
+MAX_REQUESTS = 500
 
 
 def load_news():
@@ -18,6 +18,23 @@ def load_news():
             return json.load(file)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+
+
+def save_news(news_data):
+    with open(NEWS_FILE, "w", encoding="utf-8") as file:
+        json.dump(news_data, file, ensure_ascii=False, indent=4)
+
+
+def get_last_processed_hour():
+    try:
+        with open(OUTPUT_CSV, "r", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            last_row = None
+            for row in reader:
+                last_row = row
+            return int(last_row["timestamp"]) if last_row else None
+    except (FileNotFoundError, KeyError, ValueError):
+        return None
 
 
 def analyze_market_reaction(news_text):
@@ -44,7 +61,7 @@ def analyze_market_reaction(news_text):
         if re.fullmatch(r"0(\.\d+)?|1(\.0+)?", output_text):
             return float(output_text)
         else:
-            analyze_market_reaction(news_text)
+            return analyze_market_reaction(news_text)
     else:
         return None
 
@@ -55,27 +72,28 @@ def process_news():
         print("Немає новин для обробки.")
         return
 
+    last_processed_hour = get_last_processed_hour()
     news_by_hour = defaultdict(list)
     for news in news_data:
         dt = datetime.strptime(news["published_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         unix_timestamp = int(dt.timestamp())
         hour_key = unix_timestamp - (unix_timestamp % 3600)
-        news_by_hour[hour_key].append(news)
+        if last_processed_hour is None or hour_key > last_processed_hour:
+            news_by_hour[hour_key].append(news)
 
-    all_hours = sorted(news_by_hour.keys())
-    start_hour = all_hours[0]
-    end_hour = all_hours[-1]
-    full_hours = []
-    current = start_hour
-    while current <= end_hour:
-        full_hours.append(current)
-        current += 3600
+    if not news_by_hour:
+        print("Немає нових новин після останньої обробленої години.")
+        return
 
     analyzed_results = []
-    last_valid_score = None
+    last_valid_score = 0.5
     request_count = 0
+    previous_hour_score = last_valid_score
 
-    for hour in full_hours:
+    start_hour = min(news_by_hour.keys(), default=last_processed_hour or 0)
+    end_hour = max(news_by_hour.keys(), default=start_hour)
+
+    for hour in range(start_hour, end_hour + 3600, 3600):
         dt_hour = datetime.fromtimestamp(hour, tz=timezone.utc)
         if hour in news_by_hour:
             combined_text = " ".join(news["summary"] for news in news_by_hour[hour])
@@ -84,13 +102,13 @@ def process_news():
             if score is not None:
                 last_valid_score = score
             else:
-                score = last_valid_score if last_valid_score is not None else 0
-            short_text = combined_text.strip()[:40]
-            print(f"Година {dt_hour}: score = {score}, новина: {short_text}")
+                score = last_valid_score
         else:
-            print(f"Немає новин для години {dt_hour}, встановлюю коефіцієнт 0.5")
-            score = 0.55
-            print(f"Година {dt_hour}: score = {score}")
+            score = previous_hour_score
+        previous_hour_score = score
+
+        short_text = combined_text.strip()[:40] if hour in news_by_hour else "Немає новин"
+        print(f"Година {dt_hour}: score = {score}, новина: {short_text}")
 
         analyzed_results.append({
             "timestamp": hour,
@@ -102,10 +120,11 @@ def process_news():
             print("Досягнуто максимальну кількість запитів. Зупинка програми.")
             break
 
-    with open(OUTPUT_CSV, "w", encoding="utf-8", newline="") as csvfile:
+    with open(OUTPUT_CSV, "a", encoding="utf-8", newline="") as csvfile:
         fieldnames = ["timestamp", "date", "score"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
+        if csvfile.tell() == 0:
+            writer.writeheader()
         for row in analyzed_results:
             writer.writerow(row)
 
