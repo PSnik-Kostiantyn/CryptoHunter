@@ -1,15 +1,17 @@
+import os
 import requests
 import json
 import csv
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-GEMINI_API_KEY = "AIzaSyCmfYo2PTrYX9u7stQM2DNlIupoSSLxcsI"
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 NEWS_FILE = "news.json"
 OUTPUT_CSV = "analyzed_news.csv"
-MAX_REQUESTS = 500
+MAX_REQUESTS = 120
 
 
 def load_news():
@@ -63,10 +65,12 @@ def analyze_market_reaction(news_text):
         else:
             return analyze_market_reaction(news_text)
     else:
+        print("Error while getting news data")
         return None
 
 
 def process_news():
+    start_time = time.time()
     news_data = load_news()
     if not news_data:
         print("Немає новин для обробки.")
@@ -128,7 +132,9 @@ def process_news():
         for row in analyzed_results:
             writer.writerow(row)
 
-    print("Обробку завершено. Результати збережено у CSV.")
+    end_time = time.time()
+    execution_time = (end_time - start_time) / 60
+    print(f"Обробку завершено. Результати збережено у CSV. \nЧас виконання: {execution_time:.2f} хвилин.")
 
 
 if __name__ == "__main__":
