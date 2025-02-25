@@ -15,7 +15,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 NEWS_FILE = "news.json"
 OUTPUT_CSV = "analyzed_news.csv"
-MAX_REQUESTS = 400
+MAX_REQUESTS = 700
 
 
 def load_news():
@@ -43,7 +43,7 @@ def get_last_processed_hour():
         return None
 
 
-def analyze_market_reaction(news_text):
+def analyze_market_reaction(news_text, gemini_api = GEMINI_API_URL):
     request_payload = {
         "contents": [{
             "parts": [{"text": (
@@ -59,7 +59,7 @@ def analyze_market_reaction(news_text):
         }]
     }
     headers = {"Content-Type": "application/json"}
-    response = requests.post(GEMINI_API_URL, headers=headers, data=json.dumps(request_payload))
+    response = requests.post(gemini_api, headers=headers, data=json.dumps(request_payload))
 
     if response.status_code == 200:
         result = response.json()
@@ -69,8 +69,8 @@ def analyze_market_reaction(news_text):
         else:
             return analyze_market_reaction(news_text)
     else:
-        print("Error while getting news data")
-        print(response.text)
+        # print("Error while getting news data")
+        # print(response.text)
         return None
 
 
@@ -86,7 +86,7 @@ def process_news():
     for news in news_data:
         dt = datetime.strptime(news["published_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         unix_timestamp = int(dt.timestamp())
-        hour_key = unix_timestamp - (unix_timestamp % 3600)
+        hour_key = unix_timestamp - (unix_timestamp % 3600) + 3600
         if last_processed_hour is None or hour_key > last_processed_hour:
             news_by_hour[hour_key].append(news)
 
@@ -111,12 +111,16 @@ def process_news():
             if score is not None:
                 last_valid_score = score
             else:
-                time.sleep(60)
+                time.sleep(2)
                 print("_________________________________")
-                score = analyze_market_reaction(combined_text)
+                score = analyze_market_reaction(combined_text, gemini_api = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}")
                 request_count += 1
         else:
             score = previous_hour_score
+
+        if score is None:
+            score = last_valid_score
+
         previous_hour_score = score
 
         short_text = combined_text.strip()[:40] if hour in news_by_hour else "Немає новин"
