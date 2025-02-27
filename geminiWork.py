@@ -15,7 +15,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 NEWS_FILE = "news.json"
 OUTPUT_CSV = "analyzed_news.csv"
-MAX_REQUESTS = 700
+MAX_REQUESTS = 50
 
 
 def load_news():
@@ -79,6 +79,7 @@ def process_news():
     news_data = load_news()
     if not news_data:
         print("Немає новин для обробки.")
+        request_count = MAX_REQUESTS
         return
 
     last_processed_hour = get_last_processed_hour()
@@ -114,7 +115,6 @@ def process_news():
                 time.sleep(2)
                 print("_________________________________")
                 score = analyze_market_reaction(combined_text, gemini_api = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}")
-                request_count += 1
         else:
             score = previous_hour_score
 
