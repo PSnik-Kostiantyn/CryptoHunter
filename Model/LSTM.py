@@ -134,3 +134,26 @@ if __name__ == '__main__':
     plt.plot(model.predict())
     plt.title("Predictions")
     plt.show()
+    #
+    # scaled_data, scaled_target, training_data_len, _, target_scaler = model.preprocess_data(
+    #     model.data, model.features, model.target
+    # )
+    #
+    # test_data = scaled_data[training_data_len - model.sequence_length:]
+    # test_target = scaled_target[training_data_len - model.sequence_length:]
+    # X_test, y_test = model.create_sequences(test_data, test_target)
+    #
+    # predictions_scaled = model.model.predict(X_test, verbose=0)
+    # predictions = target_scaler.inverse_transform(predictions_scaled.reshape(-1, 1))
+    #
+    # y_test_actual = target_scaler.inverse_transform(y_test.reshape(-1, 1))
+    #
+    # mae = mean_absolute_error(y_test_actual, predictions)
+    # mse = mean_squared_error(y_test_actual, predictions)
+    # rmse = np.sqrt(mse)
+    # mre = np.mean(np.abs((y_test_actual - predictions) / y_test_actual)) * 100
+    #
+    # print(f"MAE: {mae:.2f}")
+    # print(f"MSE: {mse:.2f}")
+    # print(f"RMSE: {rmse:.2f}")
+    # print(f"Mean Relative Error: {mre:.2f}%")
