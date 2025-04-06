@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from torch.utils.data import DataLoader, Dataset
+import os
 
 data = pd.read_csv("datasets/BTC_ready.csv")
 data["Close time"] = pd.to_datetime(data["Close time"])
@@ -15,18 +16,15 @@ features = ["Open", "High", "Low", "Close", "Volume", "Quote asset volume",
             "Number of trades", "Taker buy base asset volume", "Taker buy quote asset volume",
             "Score", "SMA_20", "RSI_14", "RSI_7", "MACD_14"]
 
-data["Close_next"] = data["Close"].shift(-1)
-data.dropna(inplace=True)
-
 X = data[features].values
-y = data["Close_next"].values.reshape(-1, 1)
+y = data["Close"].values.reshape(-1, 1)
 
 scaler_X = MinMaxScaler()
 scaler_y = MinMaxScaler()
 X_scaled = scaler_X.fit_transform(X)
 y_scaled = scaler_y.fit_transform(y)
 
-sequence_length = 50
+sequence_length = 120
 
 def create_sequences(X, y, seq_length):
     X_seq, y_seq = [], []
@@ -78,11 +76,7 @@ class TimeSeriesTransformer(nn.Module):
         super(TimeSeriesTransformer, self).__init__()
         self.input_projection = nn.Linear(input_dim, d_model)
         self.positional_encoding = PositionalEncoding(d_model, max_len)
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward,
-            batch_first=True
-        )
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.fc = nn.Linear(d_model, 1)
 
@@ -98,51 +92,48 @@ model = TimeSeriesTransformer(input_dim=X_train.shape[2]).to(device)
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-epochs = 20
-for epoch in range(epochs):
-    model.train()
-    total_loss = 0
-    for X_batch, y_batch in train_loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        optimizer.zero_grad()
-        output = model(X_batch).squeeze()
-        loss = criterion(output, y_batch.squeeze())
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.6f}")
+model_path = "transformer_model.pth"
+if not os.path.exists(model_path):
+    epochs = 20
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        for X_batch, y_batch in train_loader:
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            optimizer.zero_grad()
+            output = model(X_batch).squeeze()
+            loss = criterion(output, y_batch.squeeze())
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.6f}")
+    torch.save(model.state_dict(), model_path)
+else:
+    model.load_state_dict(torch.load(model_path))
+    print("Model loaded.")
 
-model.eval()
-predictions = []
-actuals = []
+def forecast(model, last_sequence, steps):
+    model.eval()
+    predictions = []
+    input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(device)
+    for _ in range(steps):
+        with torch.no_grad():
+            pred = model(input_seq).item()
+        predictions.append(pred)
+        new_input = np.roll(last_sequence, -1, axis=0)
+        new_input[-1] = np.append(new_input[-1, :-1], pred)
+        last_sequence = new_input
+        input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(device)
+    return scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
 
-with torch.no_grad():
-    for X_batch, y_batch in test_loader:
-        X_batch = X_batch.to(device)
-        output = model(X_batch).squeeze().cpu().numpy()
-        predictions.extend(output)
-        actuals.extend(y_batch.squeeze().numpy())
+last_sequence = X_scaled[-sequence_length:]
+pred_24h = forecast(model, last_sequence, 12)
 
-predictions = scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
-actuals = scaler_y.inverse_transform(np.array(actuals).reshape(-1, 1))
-
-mae = mean_absolute_error(actuals, predictions)
-mse = mean_squared_error(actuals, predictions)
-rmse = np.sqrt(mse)
-relative_errors = np.abs(predictions - actuals) / actuals * 100
-
-print(f"MAE: {mae:.2f}")
-print(f"MSE: {mse:.2f}")
-print(f"RMSE: {rmse:.2f}")
-print(f"Mean Relative Error: {relative_errors.mean():.2f}%")
-
-plt.figure(figsize=(12, 6))
-plt.plot(data["Close time"].iloc[-len(actuals):], actuals, label="Test (Actual)", color='orange')
-plt.plot(data["Close time"].iloc[-len(predictions):], predictions, label="Predictions", color='red')
-plt.xlabel("Date")
-plt.ylabel("Close Price")
-plt.title("Time Series Transformer BTC Forecast")
+plt.figure(figsize=(10, 5))
+plt.plot(range(1, 13), pred_24h, marker='o', linestyle='-', color='b', label='Прогноз ціни BTC')
+plt.xlabel('Години вперед')
+plt.ylabel('Ціна закриття BTC')
+plt.title('Прогноз ціни BTC на 24 години вперед')
 plt.legend()
-plt.grid(True)
-plt.tight_layout()
+plt.grid()
 plt.show()
