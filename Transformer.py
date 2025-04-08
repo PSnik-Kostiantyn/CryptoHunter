@@ -50,11 +50,8 @@ class TimeSeriesDataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
 
-train_dataset = TimeSeriesDataset(X_train, y_train)
-test_dataset = TimeSeriesDataset(X_test, y_test)
-
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32)
+train_loader = DataLoader(TimeSeriesDataset(X_train, y_train), batch_size=32, shuffle=True)
+test_loader = DataLoader(TimeSeriesDataset(X_test, y_test), batch_size=32)
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
@@ -73,7 +70,7 @@ class PositionalEncoding(nn.Module):
 
 class TimeSeriesTransformer(nn.Module):
     def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, max_len=500):
-        super(TimeSeriesTransformer, self).__init__()
+        super().__init__()
         self.input_projection = nn.Linear(input_dim, d_model)
         self.positional_encoding = PositionalEncoding(d_model, max_len)
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, batch_first=True)
@@ -84,18 +81,18 @@ class TimeSeriesTransformer(nn.Module):
         x = self.input_projection(x)
         x = self.positional_encoding(x)
         x = self.transformer_encoder(x)
-        x = x[:, -1, :]
-        return self.fc(x)
+        return self.fc(x[:, -1, :])
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TimeSeriesTransformer(input_dim=X_train.shape[2]).to(device)
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
 model_path = "transformer_model.pth"
-if not os.path.exists(model_path):
-    epochs = 20
-    for epoch in range(epochs):
+
+train_model = not os.path.exists(model_path)
+if train_model:
+    print("Training model...")
+    for epoch in range(20):
         model.train()
         total_loss = 0
         for X_batch, y_batch in train_loader:
@@ -106,11 +103,48 @@ if not os.path.exists(model_path):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.6f}")
+        print(f"Epoch {epoch+1}/20, Loss: {total_loss/len(train_loader):.6f}")
     torch.save(model.state_dict(), model_path)
+    print("Model trained and saved.")
+
+    print("\nEvaluating on test set...")
+    model.eval()
+    predictions = []
+    actuals = []
+
+    with torch.no_grad():
+        for X_batch, y_batch in test_loader:
+            X_batch = X_batch.to(device)
+            output = model(X_batch).squeeze().cpu().numpy()
+            predictions.extend(output)
+            actuals.extend(y_batch.squeeze().numpy())
+
+    predictions = scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
+    actuals = scaler_y.inverse_transform(np.array(actuals).reshape(-1, 1))
+
+    mae = mean_absolute_error(actuals, predictions)
+    mse = mean_squared_error(actuals, predictions)
+    rmse = np.sqrt(mse)
+    rel_error = np.mean(np.abs(predictions - actuals) / actuals) * 100
+
+    print(f"MAE: {mae:.2f}")
+    print(f"MSE: {mse:.2f}")
+    print(f"RMSE: {rmse:.2f}")
+    print(f"Mean Relative Error: {rel_error:.2f}%")
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(actuals, label="Actual", color='orange')
+    plt.plot(predictions, label="Predicted", color='blue')
+    plt.title("Model Evaluation on Test Set")
+    plt.xlabel("Samples")
+    plt.ylabel("BTC Close Price")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 else:
     model.load_state_dict(torch.load(model_path))
-    print("Model loaded.")
+    print("Model loaded from disk.")
 
 def forecast(model, last_sequence, steps):
     model.eval()
@@ -127,13 +161,14 @@ def forecast(model, last_sequence, steps):
     return scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
 
 last_sequence = X_scaled[-sequence_length:]
-pred_24h = forecast(model, last_sequence, 12)
+pred_future = forecast(model, last_sequence, steps=12)
 
 plt.figure(figsize=(10, 5))
-plt.plot(range(1, 13), pred_24h, marker='o', linestyle='-', color='b', label='Прогноз ціни BTC')
+plt.plot(range(1, len(pred_future)+1), pred_future, marker='o', linestyle='-', color='b', label='Прогноз ціни BTC')
 plt.xlabel('Години вперед')
 plt.ylabel('Ціна закриття BTC')
-plt.title('Прогноз ціни BTC на 24 години вперед')
+plt.title(f'Прогноз ціни BTC на {len(pred_future)} годин вперед')
 plt.legend()
 plt.grid()
+plt.tight_layout()
 plt.show()
