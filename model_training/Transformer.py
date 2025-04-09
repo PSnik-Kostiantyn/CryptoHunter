@@ -8,7 +8,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from torch.utils.data import DataLoader, Dataset
 import os
 
-data = pd.read_csv("datasets/BTC_ready.csv")
+data = pd.read_csv("../datasets/BTC_ready.csv")
 data["Close time"] = pd.to_datetime(data["Close time"])
 data = data.sort_values("Close time")
 
@@ -35,7 +35,7 @@ def create_sequences(X, y, seq_length):
 
 X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
 
-train_size = int(len(X_seq) * 0.8)
+train_size = int(len(X_seq))
 X_train, X_test = X_seq[:train_size], X_seq[train_size:]
 y_train, y_test = y_seq[:train_size], y_seq[train_size:]
 
@@ -87,7 +87,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TimeSeriesTransformer(input_dim=X_train.shape[2]).to(device)
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-model_path = "transformer_model.pth"
+model_path = "../models/transformer_model.pth"
 
 train_model = not os.path.exists(model_path)
 if train_model:

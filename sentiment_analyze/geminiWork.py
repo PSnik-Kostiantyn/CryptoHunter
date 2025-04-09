@@ -13,7 +13,7 @@ load_dotenv()
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-NEWS_FILE = "news.json"
+NEWS_FILE = "../datasets/news.json"
 OUTPUT_CSV = "analyzed_news.csv"
 MAX_REQUESTS = 50
 
