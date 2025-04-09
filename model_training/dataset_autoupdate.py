@@ -1,14 +1,24 @@
+import os
+import re
+
 import requests
 import pandas as pd
-import numpy as np
 import time
+
+import json
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
-import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}"
+
 
 def round_to_hour(ts):
     return ((ts + 3599) // 3600) * 3600
-
 
 def update_btc_dataset():
     dataset_path = '../datasets/BTC_ready_res.csv'
@@ -102,9 +112,62 @@ def update_btc_dataset():
     full_df.to_csv(dataset_path, index=False)
     print("Оновлено BTC_ready_res.csv")
 
+def get_news_for_certain_hour(unix_timestamp):
+    # TODO implement scrapper повертає String (усі новини об'єднані) або None, якщо новин немає
+    return None
+
+def analyze_market_reaction(news_text, gemini_api=GEMINI_API_URL):
+    request_payload = {
+        "contents": [{
+            "parts": [{"text": (
+                f"Output only the number of the score. Based on this news: {news_text} "
+                "analyze the sentiment and provide a score from 0 to 1, where:\n"
+                "0 means extremely, extremely negative,\n"
+                "0.1 means very negative,\n"
+                "0.9 means very positive, and 0.5 is neutral\n"
+                "1 means extremely, extremely positive for Bitcoin.\n"
+                "Any value between 0 and 1 is possible to capture the nuances of the sentiment. "
+                "Output only the number."
+            )}]
+        }]
+    }
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(gemini_api, headers=headers, data=json.dumps(request_payload))
+
+    if response.status_code == 200:
+        result = response.json()
+        output_text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        if re.fullmatch(r"0(\.\d+)?|1(\.0+)?", output_text):
+            return float(output_text)
+        else:
+            return analyze_market_reaction(news_text)
+    else:
+        print(response, {response.text})
+        return None
+
+def get_previous_score(unix_timestamp, dataset_path='../datasets/BTC_ready_res.csv'):
+    df = pd.read_csv(dataset_path)
+    df["Open time"] = pd.to_datetime(df["Open time"], unit='s')
+    df["timestamp"] = df["Open time"].astype(int) // 10**9
+    df = df[df["timestamp"] < unix_timestamp]
+    if df.empty:
+        return 0.5
+    return df.sort_values("timestamp").iloc[-1]["Score"]
+
 def analyze_news_by_data(unix_timestamp):
-    # TODO: імплементувати реальний аналіз новин
-    return np.random.uniform(-1, 1)
+    news_items = get_news_for_certain_hour(unix_timestamp)
+    if news_items is None:
+        return get_previous_score(unix_timestamp)
+
+    print(news_items)
+    score = analyze_market_reaction(news_items)
+    print(score)
+    if score is None:
+        time.sleep(2)
+        score = analyze_market_reaction(news_items, gemini_api=f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}")
+    if score is None:
+        return get_previous_score(unix_timestamp)
+    return score
 
 if __name__ == "__main__":
     update_btc_dataset()
