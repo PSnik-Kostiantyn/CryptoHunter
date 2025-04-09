@@ -4,19 +4,28 @@ import numpy as np
 import time
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
-from datetime import datetime
 import os
+
+def round_to_hour(ts):
+    return ((ts + 3599) // 3600) * 3600
+
 
 def update_btc_dataset():
     dataset_path = '../datasets/BTC_ready_res.csv'
     print("Завантаження існуючих даних...")
     df = pd.read_csv(dataset_path)
-    df["Close time"] = pd.to_datetime(df["Close time"])
-    last_timestamp = df["Close time"].max()
-    print("Останній запис у датасеті:", last_timestamp)
 
-    now = pd.Timestamp.utcnow().floor('h').tz_localize(None)
-    if now <= last_timestamp:
+    if df.empty:
+        print("Файл порожній або невалідний.")
+        return
+
+    last_timestamp = int(df["Close time"].max())
+    print("Останній запис у датасеті (Unix):", last_timestamp)
+
+    now_unix = int(time.time())
+    now_hour_unix = now_unix - (now_unix % 3600)
+
+    if now_hour_unix <= last_timestamp:
         print("Дані вже актуальні.")
         return
 
@@ -24,10 +33,10 @@ def update_btc_dataset():
     limit = 2500
     added_rows = []
     requests_sent = 0
-    current_time = last_timestamp + pd.Timedelta(hours=1)
+    current_time = last_timestamp + 3600
 
-    while current_time <= now and requests_sent < limit:
-        start_time_unix = int(current_time.timestamp() * 1000)
+    while current_time <= now_hour_unix and requests_sent < limit:
+        start_time_unix = current_time * 1000
         url = "https://api.binance.com/api/v3/klines"
         params = {
             "symbol": "BTCUSDT",
@@ -44,7 +53,7 @@ def update_btc_dataset():
 
             candle = candle_data[0]
             open_time = int(candle[0]) // 1000
-            close_time = int(candle[6]) // 1000
+            close_time = round_to_hour(int(candle[6]) // 1000)
 
             score = analyze_news_by_data(open_time)
             requests_sent += 1
@@ -56,7 +65,7 @@ def update_btc_dataset():
                 "Low": float(candle[3]),
                 "Close": float(candle[4]),
                 "Volume": float(candle[5]),
-                "Close time": pd.to_datetime(close_time, unit='s'),
+                "Close time": close_time,
                 "Quote asset volume": float(candle[7]),
                 "Number of trades": int(candle[8]),
                 "Taker buy base asset volume": float(candle[9]),
@@ -64,8 +73,8 @@ def update_btc_dataset():
                 "Score": score
             }
             added_rows.append(row)
-            print("Processing")
-            current_time += pd.Timedelta(hours=1)
+            print(f"Додано: {close_time}")
+            current_time += 3600
             time.sleep(0.1)
 
         except Exception as e:
@@ -80,7 +89,6 @@ def update_btc_dataset():
     print(f"Додано {len(new_df)} нових рядків.")
 
     full_df = pd.concat([df, new_df], ignore_index=True)
-    full_df["Close time"] = pd.to_datetime(full_df["Close time"])
     full_df = full_df.sort_values("Close time")
 
     full_df["SMA_20"] = full_df["Close"].rolling(window=20).mean()
@@ -92,7 +100,7 @@ def update_btc_dataset():
 
     full_df = full_df.dropna()
     full_df.to_csv(dataset_path, index=False)
-    print("Оновлено BTC_ready.csv")
+    print("Оновлено BTC_ready_res.csv")
 
 def analyze_news_by_data(unix_timestamp):
     # TODO: імплементувати реальний аналіз новин
