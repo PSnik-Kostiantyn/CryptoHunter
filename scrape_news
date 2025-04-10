@@ -1,0 +1,10 @@
+#!/bin/bash
+
+VENV_PATH="./.venv"
+
+source "$VENV_PATH/Scripts/activate"
+
+cd NewsScrapper || exit
+scrapy crawl news
+
+deactivate
