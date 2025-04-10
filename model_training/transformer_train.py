@@ -26,7 +26,6 @@ y_scaled = scaler_y.fit_transform(y)
 
 sequence_length = 120
 
-
 def create_sequences(X, y, seq_length):
     X_seq, y_seq = [], []
     for i in range(len(X) - seq_length):
@@ -34,12 +33,10 @@ def create_sequences(X, y, seq_length):
         y_seq.append(y[i + seq_length])
     return np.array(X_seq), np.array(y_seq)
 
-
 X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
 train_size = int(len(X_seq))
 X_train, X_test = X_seq[:train_size], X_seq[train_size:]
 y_train, y_test = y_seq[:train_size], y_seq[train_size:]
-
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, X, y):
@@ -72,7 +69,6 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return x
 
-
 class TimeSeriesTransformer(nn.Module):
     def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, max_len=500):
         super().__init__()
@@ -88,7 +84,6 @@ class TimeSeriesTransformer(nn.Module):
         x = self.positional_encoding(x)
         x = self.transformer_encoder(x)
         return self.fc(x[:, -1, :])
-
 
 def load_or_train_model(model, train_loader, test_loader, model_path, criterion, optimizer, scaler_y):
     if os.path.exists(model_path):
@@ -112,7 +107,6 @@ def load_or_train_model(model, train_loader, test_loader, model_path, criterion,
         print("Model trained and saved.")
         evaluate_model(model, test_loader, scaler_y)
     return model
-
 
 def evaluate_model(model, test_loader, scaler_y):
     print("\nEvaluating on test set...")
@@ -151,7 +145,6 @@ def evaluate_model(model, test_loader, scaler_y):
     plt.tight_layout()
     plt.show()
 
-
 def forecast(model, last_sequence, steps, last_timestamp):
     model.eval()
     predictions = []
@@ -173,7 +166,6 @@ def forecast(model, last_sequence, steps, last_timestamp):
         input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(device)
 
     return predictions
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TimeSeriesTransformer(input_dim=X_train.shape[2]).to(device)
