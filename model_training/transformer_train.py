@@ -145,6 +145,27 @@ def evaluate_model(model, test_loader, scaler_y):
     plt.tight_layout()
     plt.show()
 
+def train_model(model, train_loader, optimizer, epochs=5):
+    criterion = torch.nn.MSELoss()
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        for X_batch, y_batch in train_loader:
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            optimizer.zero_grad()
+            output = model(X_batch).squeeze()
+            loss = criterion(output, y_batch.squeeze())
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(train_loader):.6f}")
+
+    torch.save(model.state_dict(), model_path)
+    print("Модель дотренована та збережена.")
+
+
 def forecast(model, last_sequence, steps, last_timestamp):
     model.eval()
     predictions = []

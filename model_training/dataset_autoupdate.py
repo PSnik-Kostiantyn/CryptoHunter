@@ -11,6 +11,8 @@ from ta.trend import MACD
 
 from dotenv import load_dotenv
 
+from model_training.transformer_train import *
+
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -111,6 +113,8 @@ def update_btc_dataset():
     full_df = full_df.dropna()
     full_df.to_csv(dataset_path, index=False)
     print("Оновлено BTC_ready_res.csv")
+
+    train_model(full_df)
 
 def get_news_for_certain_hour(unix_timestamp):
     # TODO implement scrapper повертає String (усі новини об'єднані) або None, якщо новин немає
