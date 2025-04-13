@@ -34,9 +34,14 @@ def create_sequences(X, y, seq_length):
     return np.array(X_seq), np.array(y_seq)
 
 X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
-train_size = int(len(X_seq))
-X_train, X_test = X_seq[:train_size], X_seq[train_size:]
-y_train, y_test = y_seq[:train_size], y_seq[train_size:]
+
+X_train = X_seq
+y_train = y_seq
+
+test_size = int(len(X_seq) * 0.2)
+X_test = X_seq[-test_size:]
+y_test = y_seq[-test_size:]
+
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, X, y):
@@ -91,7 +96,7 @@ def load_or_train_model(model, train_loader, test_loader, model_path, criterion,
         print("Model loaded from disk.")
     else:
         print("Training model...")
-        for epoch in range(20):
+        for epoch in range(30):
             model.train()
             total_loss = 0
             for X_batch, y_batch in train_loader:
@@ -113,6 +118,10 @@ def evaluate_model(model, test_loader, scaler_y):
     model.eval()
     predictions = []
     actuals = []
+
+    if len(test_loader.dataset) == 0:
+        print("Попередження: тестовий набір порожній. Оцінка моделі пропущена.")
+        return
 
     with torch.no_grad():
         for X_batch, y_batch in test_loader:
@@ -164,6 +173,46 @@ def train_model(model, train_loader, optimizer, epochs=5):
 
     torch.save(model.state_dict(), model_path)
     print("Модель дотренована та збережена.")
+
+
+def train_model_on_new_data(df):
+    print("Підготовка нових даних для донавчання...")
+
+    features = ["Open", "High", "Low", "Close", "Volume", "Quote asset volume",
+                "Number of trades", "Taker buy base asset volume", "Taker buy quote asset volume",
+                "Score", "SMA_20", "RSI_14", "RSI_7", "MACD_14"]
+
+    df["Close time"] = pd.to_datetime(df["Close time"])
+    df = df.sort_values("Close time")
+
+    X = df[features].values
+    y = df["Close"].values.reshape(-1, 1)
+
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    X_scaled = scaler_X.fit_transform(X)
+    y_scaled = scaler_y.fit_transform(y)
+
+    sequence_length = 120
+    X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
+
+    N = 500
+    X_new, y_new = X_seq[-N:], y_seq[-N:]
+
+    new_loader = DataLoader(TimeSeriesDataset(X_new, y_new), batch_size=32, shuffle=True)
+
+    model = TimeSeriesTransformer(input_dim=X_new.shape[2]).to(device)
+    model_path = "../models/transformer_model.pth"
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path))
+        print("Модель завантажена для донавчання.")
+    else:
+        print("Не знайдено існуючої моделі, створюю нову...")
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    train_model(model, new_loader, optimizer, epochs=5)
+
+    print("Донавчання завершено.")
 
 
 def forecast(model, last_sequence, steps, last_timestamp):
