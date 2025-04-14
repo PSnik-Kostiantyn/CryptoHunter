@@ -1,5 +1,6 @@
 import re
 
+import pandas as pd
 import requests
 import time
 from datetime import datetime, timedelta, timezone
@@ -8,8 +9,6 @@ from ta.momentum import RSIIndicator
 from ta.trend import MACD
 
 from dotenv import load_dotenv
-
-from model_training.transformer_train import *
 
 load_dotenv()
 
@@ -112,7 +111,7 @@ def update_btc_dataset():
     full_df.to_csv(dataset_path, index=False)
     print("Оновлено BTC_ready.csv")
 
-    train_model_on_new_data(full_df)
+    # train_model_on_new_data(full_df)
 
 def get_news_for_certain_hour(unix_timestamp):
     target_time = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
