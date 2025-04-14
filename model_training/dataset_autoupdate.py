@@ -1,10 +1,8 @@
-import os
 import re
 
 import requests
-import pandas as pd
 import time
-
+from datetime import datetime, timedelta, timezone
 import json
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
@@ -23,7 +21,7 @@ def round_to_hour(ts):
     return ((ts + 3599) // 3600) * 3600
 
 def update_btc_dataset():
-    dataset_path = '../datasets/BTC_ready_res.csv'
+    dataset_path = '../datasets/BTC_ready.csv'
     print("Завантаження існуючих даних...")
     df = pd.read_csv(dataset_path)
 
@@ -42,10 +40,10 @@ def update_btc_dataset():
         return
 
     print("Починається оновлення...")
-    limit = 2500
+    limit = 2000
     added_rows = []
     requests_sent = 0
-    current_time = last_timestamp + 3600
+    current_time = last_timestamp
 
     while current_time <= now_hour_unix and requests_sent < limit:
         start_time_unix = current_time * 1000
@@ -112,13 +110,33 @@ def update_btc_dataset():
 
     full_df = full_df.dropna()
     full_df.to_csv(dataset_path, index=False)
-    print("Оновлено BTC_ready_res.csv")
+    print("Оновлено BTC_ready.csv")
 
     train_model_on_new_data(full_df)
 
 def get_news_for_certain_hour(unix_timestamp):
-    # TODO implement scrapper повертає String (усі новини об'єднані) або None, якщо новин немає
-    return None
+    target_time = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
+    next_hour = target_time + timedelta(hours=1)
+
+    try:
+        with open('../datasets/news.json', 'r', encoding='utf-8') as f:
+            news_dataset = json.load(f)
+    except Exception as e:
+        print(f"Помилка при читанні файлу: {e}")
+        return None
+
+    matching_news = []
+    for news in news_dataset:
+        try:
+            published_at = datetime.fromisoformat(news['published_at'].replace('Z', '+00:00'))
+            if target_time <= published_at < next_hour:
+                summary = news.get('summary', '')
+                content = news.get('content', '')
+                matching_news.append(f"{summary}\n{content}")
+        except Exception as e:
+            print(f"Помилка обробки новини: {e}")
+
+    return '\n\n'.join(matching_news) if matching_news else None
 
 def analyze_market_reaction(news_text, gemini_api=GEMINI_API_URL):
     request_payload = {
@@ -149,7 +167,7 @@ def analyze_market_reaction(news_text, gemini_api=GEMINI_API_URL):
         print(response, {response.text})
         return None
 
-def get_previous_score(unix_timestamp, dataset_path='../datasets/BTC_ready_res.csv'):
+def get_previous_score(unix_timestamp, dataset_path='../datasets/BTC_ready.csv'):
     df = pd.read_csv(dataset_path)
     df["Open time"] = pd.to_datetime(df["Open time"], unit='s')
     df["timestamp"] = df["Open time"].astype(int) // 10**9
@@ -163,9 +181,7 @@ def analyze_news_by_data(unix_timestamp):
     if news_items is None:
         return get_previous_score(unix_timestamp)
 
-    print(news_items)
     score = analyze_market_reaction(news_items)
-    print(score)
     if score is None:
         time.sleep(2)
         score = analyze_market_reaction(news_items, gemini_api=f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}")
