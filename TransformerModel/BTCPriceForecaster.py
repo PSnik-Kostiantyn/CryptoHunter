@@ -1,4 +1,5 @@
 import os
+
 import pandas as pd
 import numpy as np
 import torch
@@ -82,7 +83,7 @@ class BTCPriceForecaster:
 
         self.X_seq, self.y_seq = self.create_sequences(X_scaled, y_scaled)
 
-        test_size = int(len(self.X_seq) * 0.2)
+        test_size = int(len(self.X_seq) * 0.05)
         self.X_train = self.X_seq[:-test_size]
         self.y_train = self.y_seq[:-test_size]
         self.X_test = self.X_seq[-test_size:]
@@ -108,7 +109,7 @@ class BTCPriceForecaster:
             print("Model loaded from disk.")
         else:
             print("Training model...")
-            for epoch in range(3):
+            for epoch in range(30):
                 self.model.train()
                 total_loss = 0
                 for X_batch, y_batch in self.train_loader:
@@ -129,9 +130,9 @@ class BTCPriceForecaster:
         predictions = []
         actuals = []
 
-        if len(self.test_loader.dataset) == 0:
-            print("Попередження: тестовий набір порожній. Оцінка моделі пропущена.")
-            return
+        # if len(self.test_loader.dataset) == 0:
+        #     print("Попередження: тестовий набір порожній. Оцінка моделі пропущена.")
+        #     return
 
         with torch.no_grad():
             for X_batch, y_batch in self.test_loader:
@@ -165,24 +166,46 @@ class BTCPriceForecaster:
         plt.show()
 
     def forecast(self, steps=12):
+        self.data = pd.read_csv(self.data_path)
+
+        if np.issubdtype(self.data["Close time"].dtype, np.number):
+            self.data["Close time"] = pd.to_datetime(self.data["Close time"], unit='s')
+        else:
+            self.data["Close time"] = pd.to_datetime(self.data["Close time"])
+
+        self.data = self.data.sort_values("Close time")
+
+        X = self.data[self.features].values
+        y = self.data["Close"].values.reshape(-1, 1)
+
+        self.scaler_X = MinMaxScaler()
+        self.scaler_y = MinMaxScaler()
+        X_scaled = self.scaler_X.fit_transform(X)
+        y_scaled = self.scaler_y.fit_transform(y)
+
+        last_sequence = X_scaled[-self.sequence_length:]
+        input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
+
+        current_time = self.data["Close time"].iloc[-1]
         self.model.eval()
         predictions = []
-        last_sequence = self.X_scaled[-self.sequence_length:]
-        input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
-        current_time = self.data["Close time"].iloc[-1]
 
         for step in range(steps):
             with torch.no_grad():
                 pred = self.model(input_seq).item()
-            timestamp = current_time + pd.Timedelta(hours=step + 1)
+
+            forecast_time = current_time + pd.Timedelta(hours=step + 1)
+            unix_timestamp = int(forecast_time.timestamp())
+
             predictions.append({
-                "timestamp": int(timestamp.timestamp()),
+                "timestamp": unix_timestamp,
                 "close": float(self.scaler_y.inverse_transform([[pred]])[0][0])
             })
 
-            new_input = np.roll(last_sequence, -1, axis=0)
-            new_input[-1] = np.append(new_input[-1, :-1], pred)
-            last_sequence = new_input
+            next_input = np.roll(last_sequence, -1, axis=0)
+            next_input[-1] = X_scaled[-1]
+            next_input[-1][-1] = pred
+            last_sequence = next_input
             input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
 
         return predictions
@@ -228,6 +251,7 @@ class BTCPriceForecaster:
 
         X_seq, y_seq = self.create_sequences(X_scaled, y_scaled)
         if len(X_seq) == 0:
+            print(X_seq)
             print("Недостатньо даних для створення послідовностей.")
             return
 
