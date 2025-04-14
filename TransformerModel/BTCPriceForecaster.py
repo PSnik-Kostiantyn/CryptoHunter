@@ -1,46 +1,95 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader, Dataset
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from torch.utils.data import DataLoader, Dataset
-import os
+import matplotlib.pyplot as plt
+
+
+class TimeSeriesDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:, :x.size(1)]
+        return x
+
+
+class TimeSeriesTransformer(nn.Module):
+    def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, max_len=500):
+        super().__init__()
+        self.input_projection = nn.Linear(input_dim, d_model)
+        self.positional_encoding = PositionalEncoding(d_model, max_len)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward,
+                                                   batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.fc = nn.Linear(d_model, 1)
+
+    def forward(self, x):
+        x = self.input_projection(x)
+        x = self.positional_encoding(x)
+        x = self.transformer_encoder(x)
+        return self.fc(x[:, -1, :])
+
 
 class BTCPriceForecaster:
     def __init__(self, data_path, model_path="../models/transformer_model.pth", sequence_length=120):
         self.data_path = data_path
         self.model_path = model_path
         self.sequence_length = sequence_length
-        self.features = [
-            "Open", "High", "Low", "Close", "Volume", "Quote asset volume",
-            "Number of trades", "Taker buy base asset volume", "Taker buy quote asset volume",
-            "Score", "SMA_20", "RSI_14", "RSI_7", "MACD_14"
-        ]
+        self.features = ["Open", "High", "Low", "Close", "Volume", "Quote asset volume",
+                         "Number of trades", "Taker buy base asset volume", "Taker buy quote asset volume",
+                         "Score", "SMA_20", "RSI_14", "RSI_7", "MACD_14"]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.scaler_X = MinMaxScaler()
-        self.scaler_y = MinMaxScaler()
-        self.model = None
-        self.data = None
-        self.X_train, self.y_train, self.X_test, self.y_test = None, None, None, None
 
     def load_and_prepare_data(self):
-        data = pd.read_csv(self.data_path)
-        data["Close time"] = pd.to_datetime(data["Close time"])
-        data = data.sort_values("Close time")
-        self.data = data
+        self.data = pd.read_csv(self.data_path)
+        self.data["Close time"] = pd.to_datetime(self.data["Close time"])
+        self.data = self.data.sort_values("Close time")
 
-        X = data[self.features].values
-        y = data["Close"].values.reshape(-1, 1)
+        X = self.data[self.features].values
+        y = self.data["Close"].values.reshape(-1, 1)
+
+        self.scaler_X = MinMaxScaler()
+        self.scaler_y = MinMaxScaler()
         X_scaled = self.scaler_X.fit_transform(X)
         y_scaled = self.scaler_y.fit_transform(y)
 
-        X_seq, y_seq = self.create_sequences(X_scaled, y_scaled)
+        self.X_scaled = X_scaled
+        self.y_scaled = y_scaled
 
-        test_size = int(len(X_seq) * 0.2)
-        self.X_train, self.y_train = X_seq, y_seq
-        self.X_test, self.y_test = X_seq[-test_size:], y_seq[-test_size:]
+        self.X_seq, self.y_seq = self.create_sequences(X_scaled, y_scaled)
+
+        test_size = int(len(self.X_seq) * 0.2)
+        self.X_train = self.X_seq[:-test_size]
+        self.y_train = self.y_seq[:-test_size]
+        self.X_test = self.X_seq[-test_size:]
+        self.y_test = self.y_seq[-test_size:]
+
+        self.train_loader = DataLoader(TimeSeriesDataset(self.X_train, self.y_train), batch_size=32, shuffle=True)
+        self.test_loader = DataLoader(TimeSeriesDataset(self.X_test, self.y_test), batch_size=32)
 
     def create_sequences(self, X, y):
         X_seq, y_seq = [], []
@@ -49,86 +98,47 @@ class BTCPriceForecaster:
             y_seq.append(y[i + self.sequence_length])
         return np.array(X_seq), np.array(y_seq)
 
-    class TimeSeriesDataset(Dataset):
-        def __init__(self, X, y):
-            self.X = torch.tensor(X, dtype=torch.float32)
-            self.y = torch.tensor(y, dtype=torch.float32)
-
-        def __len__(self):
-            return len(self.X)
-
-        def __getitem__(self, idx):
-            return self.X[idx], self.y[idx]
-
-    class PositionalEncoding(nn.Module):
-        def __init__(self, d_model, max_len=5000):
-            super().__init__()
-            pe = torch.zeros(max_len, d_model)
-            position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
-            div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
-            pe[:, 0::2] = torch.sin(position * div_term)
-            pe[:, 1::2] = torch.cos(position * div_term)
-            pe = pe.unsqueeze(0)
-            self.register_buffer('pe', pe)
-
-        def forward(self, x):
-            return x + self.pe[:, :x.size(1)]
-
-    class TimeSeriesTransformer(nn.Module):
-        def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, max_len=500):
-            super().__init__()
-            self.input_projection = nn.Linear(input_dim, d_model)
-            self.positional_encoding = BTCPriceForecaster.PositionalEncoding(d_model, max_len)
-            encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead,
-                                                       dim_feedforward=dim_feedforward, batch_first=True)
-            self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-            self.fc = nn.Linear(d_model, 1)
-
-        def forward(self, x):
-            x = self.input_projection(x)
-            x = self.positional_encoding(x)
-            x = self.transformer_encoder(x)
-            return self.fc(x[:, -1, :])
-
     def build_or_load_model(self):
-        self.model = self.TimeSeriesTransformer(input_dim=self.X_train.shape[2]).to(self.device)
+        self.model = TimeSeriesTransformer(input_dim=self.X_train.shape[2]).to(self.device)
+        self.criterion = nn.MSELoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+
         if os.path.exists(self.model_path):
             self.model.load_state_dict(torch.load(self.model_path))
             print("Model loaded from disk.")
         else:
-            print("Training model from scratch...")
-            self.train_model()
+            print("Training model...")
+            for epoch in range(3):
+                self.model.train()
+                total_loss = 0
+                for X_batch, y_batch in self.train_loader:
+                    X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
+                    self.optimizer.zero_grad()
+                    output = self.model(X_batch).squeeze()
+                    loss = self.criterion(output, y_batch.squeeze())
+                    loss.backward()
+                    self.optimizer.step()
+                    total_loss += loss.item()
+                print(f"Epoch {epoch + 1}/30, Loss: {total_loss / len(self.train_loader):.6f}")
             torch.save(self.model.state_dict(), self.model_path)
-
-    def train_model(self, epochs=2, lr=1e-3):
-        train_loader = DataLoader(self.TimeSeriesDataset(self.X_train, self.y_train), batch_size=32, shuffle=True)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-
-        for epoch in range(epochs):
-            self.model.train()
-            total_loss = 0
-            for X_batch, y_batch in train_loader:
-                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
-                optimizer.zero_grad()
-                output = self.model(X_batch).squeeze()
-                loss = criterion(output, y_batch.squeeze())
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
-            print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(train_loader):.6f}")
+            print("Model trained and saved.")
 
     def evaluate_model(self):
-        test_loader = DataLoader(self.TimeSeriesDataset(self.X_test, self.y_test), batch_size=32)
+        print("\nEvaluating on test set...")
         self.model.eval()
-        predictions, actuals = [], []
+        predictions = []
+        actuals = []
+
+        if len(self.test_loader.dataset) == 0:
+            print("Попередження: тестовий набір порожній. Оцінка моделі пропущена.")
+            return
 
         with torch.no_grad():
-            for X_batch, y_batch in test_loader:
+            for X_batch, y_batch in self.test_loader:
                 X_batch = X_batch.to(self.device)
-                output = self.model(X_batch).squeeze().cpu().numpy()
+                output = self.model(X_batch).cpu().detach().numpy().reshape(-1)
                 predictions.extend(output)
-                actuals.extend(y_batch.squeeze().numpy())
+                actuals.extend(y_batch.cpu().numpy().reshape(-1))
 
         predictions = self.scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
         actuals = self.scaler_y.inverse_transform(np.array(actuals).reshape(-1, 1))
@@ -138,7 +148,10 @@ class BTCPriceForecaster:
         rmse = np.sqrt(mse)
         rel_error = np.mean(np.abs(predictions - actuals) / actuals) * 100
 
-        print(f"MAE: {mae:.2f}, MSE: {mse:.2f}, RMSE: {rmse:.2f}, Mean Relative Error: {rel_error:.2f}%")
+        print(f"MAE: {mae:.2f}")
+        print(f"MSE: {mse:.2f}")
+        print(f"RMSE: {rmse:.2f}")
+        print(f"Mean Relative Error: {rel_error:.2f}%")
 
         plt.figure(figsize=(12, 6))
         plt.plot(actuals, label="Actual", color='orange')
@@ -152,13 +165,11 @@ class BTCPriceForecaster:
         plt.show()
 
     def forecast(self, steps=12):
-        last_sequence = self.scaler_X.transform(self.data[self.features].values)[-self.sequence_length:]
-        last_timestamp = self.data["Close time"].iloc[-1]
         self.model.eval()
-
         predictions = []
+        last_sequence = self.X_scaled[-self.sequence_length:]
         input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
-        current_time = pd.to_datetime(last_timestamp)
+        current_time = self.data["Close time"].iloc[-1]
 
         for step in range(steps):
             with torch.no_grad():
@@ -176,4 +187,73 @@ class BTCPriceForecaster:
 
         return predictions
 
+    def train_model_on_new_data(self, from_timestamp, csv_path="../datasets/BTC_ready.csv"):
+        print("Перевірка оновлення CSV-файлу...")
 
+        latest_data = pd.read_csv(csv_path)
+
+        if "Close time" not in latest_data.columns:
+            print("Помилка: у CSV відсутня колонка 'Close time'")
+            return
+
+        latest_data["Close time"] = latest_data["Close time"].astype(int)
+
+        last_ts_in_csv = latest_data["Close time"].max()
+
+        if from_timestamp >= last_ts_in_csv:
+            print(f"CSV не оновився. from_timestamp = {from_timestamp}, останній в CSV = {last_ts_in_csv}")
+            return
+
+        self.data = latest_data.copy()
+
+        print(f"CSV оновився. Нові дані донавчаються з {from_timestamp} до {last_ts_in_csv}")
+
+        self.data["Close time"] = self.data["Close time"].astype(int)
+
+        df = self.data[(self.data["Close time"] > from_timestamp) & (self.data["Close time"] <= last_ts_in_csv)]
+
+        if df.empty:
+            print("Вибраний діапазон не містить нових даних.")
+            return
+
+        from_dt = pd.to_datetime(from_timestamp, unit='s')
+        last_dt = pd.to_datetime(last_ts_in_csv, unit='s')
+        print(f"Донавчання на даних з {from_dt} до {last_dt} ({len(df)} записів)")
+
+        X = df[self.features].values
+        y = df["Close"].values.reshape(-1, 1)
+
+        X_scaled = self.scaler_X.transform(X)
+        y_scaled = self.scaler_y.transform(y)
+
+        X_seq, y_seq = self.create_sequences(X_scaled, y_scaled)
+        if len(X_seq) == 0:
+            print("Недостатньо даних для створення послідовностей.")
+            return
+
+        X_new, y_new = X_seq[-500:], y_seq[-500:]
+        new_loader = DataLoader(TimeSeriesDataset(X_new, y_new), batch_size=32, shuffle=True)
+
+        if not hasattr(self, 'model'):
+            self.build_or_load_model()
+
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
+        self.train_model(self.model, new_loader, optimizer, epochs=5)
+        print("Донавчання завершено.")
+
+    def train_model(self, model, loader, optimizer, epochs=5):
+        criterion = torch.nn.MSELoss()
+        for epoch in range(epochs):
+            model.train()
+            total_loss = 0
+            for X_batch, y_batch in loader:
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
+                optimizer.zero_grad()
+                output = model(X_batch).squeeze()
+                loss = criterion(output, y_batch.squeeze())
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+            print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(loader):.6f}")
+        torch.save(model.state_dict(), self.model_path)
+        print("Модель дотренована та збережена.")

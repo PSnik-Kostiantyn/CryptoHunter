@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from TransformerModel.BTCPriceForecaster import BTCPriceForecaster
+from model_training.dataset_autoupdate import update_btc_dataset
 
 if __name__ == "__main__":
     forecaster = BTCPriceForecaster(data_path="../datasets/BTC_ready.csv")
@@ -9,6 +10,8 @@ if __name__ == "__main__":
     forecaster.build_or_load_model()
     forecaster.evaluate_model()
     future = forecaster.forecast(steps=12)
+    timestamp_from = update_btc_dataset()
+    forecaster.train_model_on_new_data(timestamp_from)
 
     for item in future:
         print(item)

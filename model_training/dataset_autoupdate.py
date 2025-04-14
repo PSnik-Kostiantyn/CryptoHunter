@@ -1,3 +1,4 @@
+import os
 import re
 
 import pandas as pd
@@ -30,16 +31,17 @@ def update_btc_dataset():
 
     last_timestamp = int(df["Close time"].max())
     print("Останній запис у датасеті (Unix):", last_timestamp)
+    return_timestamp = last_timestamp
 
     now_unix = int(time.time())
     now_hour_unix = now_unix - (now_unix % 3600)
 
     if now_hour_unix <= last_timestamp:
         print("Дані вже актуальні.")
-        return
+        return last_timestamp
 
     print("Починається оновлення...")
-    limit = 2000
+    limit = 5
     added_rows = []
     requests_sent = 0
     current_time = last_timestamp
@@ -111,7 +113,8 @@ def update_btc_dataset():
     full_df.to_csv(dataset_path, index=False)
     print("Оновлено BTC_ready.csv")
 
-    # train_model_on_new_data(full_df)
+    print(return_timestamp)
+    return return_timestamp
 
 def get_news_for_certain_hour(unix_timestamp):
     target_time = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
@@ -188,5 +191,3 @@ def analyze_news_by_data(unix_timestamp):
         return get_previous_score(unix_timestamp)
     return score
 
-if __name__ == "__main__":
-    update_btc_dataset()
