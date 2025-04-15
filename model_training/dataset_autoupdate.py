@@ -41,7 +41,7 @@ def update_btc_dataset():
         return last_timestamp
 
     print("Починається оновлення...")
-    limit = 100
+    limit = 1500
     added_rows = []
     requests_sent = 0
     current_time = last_timestamp

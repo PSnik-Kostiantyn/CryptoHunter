@@ -8,9 +8,9 @@ if __name__ == "__main__":
     forecaster = BTCPriceForecaster(data_path="../datasets/BTC_ready.csv")
     forecaster.load_and_prepare_data()
     forecaster.build_or_load_model()
-    forecaster.evaluate_model()
-    future = forecaster.forecast(steps=12)
-    #timestamp_from = update_btc_dataset()
+    # forecaster.evaluate_model()
+    future = forecaster.forecast(steps=24)
+    timestamp_from = update_btc_dataset()
     # forecaster.load_and_prepare_data()
     # forecaster.train_model_on_new_data(timestamp_from)
 
