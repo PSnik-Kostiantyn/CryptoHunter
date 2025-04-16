@@ -165,7 +165,7 @@ class BTCPriceForecaster:
         plt.tight_layout()
         plt.show()
 
-    def forecast(self, steps=12):
+    def forecast(self, steps=6):
         self.data = pd.read_csv(self.data_path)
 
         if np.issubdtype(self.data["Close time"].dtype, np.number):
@@ -187,6 +187,7 @@ class BTCPriceForecaster:
         last_sequence = last_sequence.copy()
         input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
 
+        close_index = self.features.index("Close")
         current_time = self.data["Close time"].iloc[-1]
         self.model.eval()
         predictions = []
@@ -196,20 +197,21 @@ class BTCPriceForecaster:
                 pred_scaled = self.model(input_seq).item()
 
             pred_unscaled = float(self.scaler_y.inverse_transform([[pred_scaled]])[0][0])
-
-            forecast_time = current_time + pd.Timedelta(hours=step + 1)
+            future_time = current_time + pd.Timedelta(hours=step + 1)
+            timestamp = int(future_time.timestamp())
 
             predictions.append({
-                "timestamp": int(forecast_time.timestamp()),
+                "timestamp": timestamp,
                 "close": pred_unscaled
             })
 
-            last_features = X_scaled[-1].copy()
-            close_index = self.features.index("Close")
+            last_features = last_sequence[-1].copy()
             last_features[close_index] = pred_scaled
-            last_sequence = np.roll(last_sequence, -1, axis=0)
-            last_sequence[-1] = last_features
 
+            new_sequence = np.roll(last_sequence, -1, axis=0)
+            new_sequence[-1] = last_features
+
+            last_sequence = new_sequence
             input_seq = torch.tensor(last_sequence, dtype=torch.float32).unsqueeze(0).to(self.device)
 
         return predictions
