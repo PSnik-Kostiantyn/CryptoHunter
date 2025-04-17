@@ -57,6 +57,7 @@ class TimeSeriesTransformer(nn.Module):
 
 class BTCPriceForecaster:
     def __init__(self, data_path, model_path="../models/transformer_model.pth", sequence_length=120):
+        self.seq_length = 120
         self.data_path = data_path
         self.model_path = model_path
         self.sequence_length = sequence_length
@@ -237,28 +238,38 @@ class BTCPriceForecaster:
 
         print(f"CSV оновився. Нові дані донавчаються з {from_timestamp} до {last_ts_in_csv}")
 
-        self.data["Close time"] = self.data["Close time"].astype(int)
+        df_full = self.data[self.data["Close time"] <= last_ts_in_csv]
+        new_data_start_idx = df_full[df_full["Close time"] > from_timestamp].index.min()
 
-        df = self.data[(self.data["Close time"] > from_timestamp) & (self.data["Close time"] <= last_ts_in_csv)]
-
-        if df.empty:
-            print("Вибраний діапазон не містить нових даних.")
+        if pd.isna(new_data_start_idx):
+            print("Немає нових рядків у CSV.")
             return
+
+        start_idx = max(0, new_data_start_idx - self.seq_length)
+        df_for_sequences = df_full.iloc[start_idx:]
 
         from_dt = pd.to_datetime(from_timestamp, unit='s')
         last_dt = pd.to_datetime(last_ts_in_csv, unit='s')
-        print(f"Донавчання на даних з {from_dt} до {last_dt} ({len(df)} записів)")
+        print(
+            f"Донавчання на даних з {from_dt} до {last_dt} ({len(df_for_sequences)} записів для побудови послідовностей)")
 
-        X = df[self.features].values
-        y = df["Close"].values.reshape(-1, 1)
+        X = df_for_sequences[self.features].values
+        y = df_for_sequences["Close"].values.reshape(-1, 1)
 
         X_scaled = self.scaler_X.transform(X)
         y_scaled = self.scaler_y.transform(y)
 
         X_seq, y_seq = self.create_sequences(X_scaled, y_scaled)
+
+        close_times = df_for_sequences["Close time"].values
+        target_times = close_times[self.seq_length:]
+
+        mask = target_times > from_timestamp
+        X_seq = X_seq[mask]
+        y_seq = y_seq[mask]
+
         if len(X_seq) == 0:
-            print(X_seq)
-            print("Недостатньо даних для створення послідовностей.")
+            print("Недостатньо даних для формування нових послідовностей.")
             return
 
         X_new, y_new = X_seq[-500:], y_seq[-500:]
