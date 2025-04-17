@@ -10,7 +10,7 @@ if __name__ == "__main__":
     forecaster.build_or_load_model()
     # forecaster.evaluate_model()
     timestamp_from = update_btc_dataset()
-    future = forecaster.forecast(steps=24)
+    future = forecaster.forecast(steps=12)
     # forecaster.load_and_prepare_data()
     # forecaster.train_model_on_new_data(timestamp_from)
 
