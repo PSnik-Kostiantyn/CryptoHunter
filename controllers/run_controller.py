@@ -5,7 +5,7 @@ from TransformerModel.BTCPriceForecaster import BTCPriceForecaster
 from model_training.dataset_autoupdate import update_btc_dataset
 
 if __name__ == "__main__":
-    forecaster = BTCPriceForecaster(data_path="../datasets/BTC_ready.csv")
+    forecaster = BTCPriceForecaster()
     forecaster.load_and_prepare_data()
     forecaster.build_or_load_model()
     forecaster.evaluate_model()

@@ -56,16 +56,17 @@ class TimeSeriesTransformer(nn.Module):
 
 
 class BTCPriceForecaster:
-    def __init__(self, data_path, model_path="../models/transformer_model.pth", sequence_length=120):
-        self.data_path = data_path
-        self.model_path = model_path
+    def __init__(self, sequence_length=120):
+        self.data_path = None
+        self.model_path = None
         self.sequence_length = sequence_length
         self.features = ["Open", "High", "Low", "Close", "Volume", "Quote asset volume",
                          "Number of trades", "Taker buy base asset volume", "Taker buy quote asset volume",
                          "Score", "SMA_20", "RSI_14", "RSI_7", "MACD_14"]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def load_and_prepare_data(self):
+    def load_and_prepare_data(self, data_path = "../datasets/BTC_ready.csv"):
+        self.data_path = data_path
         self.data = pd.read_csv(self.data_path)
         self.data["Close time"] = pd.to_datetime(self.data["Close time"])
         self.data = self.data.sort_values("Close time")
@@ -99,7 +100,8 @@ class BTCPriceForecaster:
             y_seq.append(y[i + self.sequence_length])
         return np.array(X_seq), np.array(y_seq)
 
-    def build_or_load_model(self):
+    def build_or_load_model(self, model_path="../models/transformer_model.pth"):
+        self.model_path = model_path
         self.model = TimeSeriesTransformer(input_dim=self.X_train.shape[2]).to(self.device)
         self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
@@ -109,7 +111,7 @@ class BTCPriceForecaster:
             print("Model loaded from disk.")
         else:
             print("Training model...")
-            for epoch in range(30):
+            for epoch in range(35):
                 self.model.train()
                 total_loss = 0
                 for X_batch, y_batch in self.train_loader:
@@ -129,10 +131,6 @@ class BTCPriceForecaster:
         self.model.eval()
         predictions = []
         actuals = []
-
-        # if len(self.test_loader.dataset) == 0:
-        #     print("Попередження: тестовий набір порожній. Оцінка моделі пропущена.")
-        #     return
 
         with torch.no_grad():
             for X_batch, y_batch in self.test_loader:
