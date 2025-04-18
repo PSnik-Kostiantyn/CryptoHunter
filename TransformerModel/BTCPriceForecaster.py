@@ -57,7 +57,6 @@ class TimeSeriesTransformer(nn.Module):
 
 class BTCPriceForecaster:
     def __init__(self, data_path, model_path="../models/transformer_model.pth", sequence_length=120):
-        self.seq_length = 120
         self.data_path = data_path
         self.model_path = model_path
         self.sequence_length = sequence_length
@@ -245,7 +244,7 @@ class BTCPriceForecaster:
             print("Немає нових рядків у CSV.")
             return
 
-        start_idx = max(0, new_data_start_idx - self.seq_length)
+        start_idx = max(0, new_data_start_idx - self.sequence_length)
         df_for_sequences = df_full.iloc[start_idx:]
 
         from_dt = pd.to_datetime(from_timestamp, unit='s')
@@ -262,7 +261,7 @@ class BTCPriceForecaster:
         X_seq, y_seq = self.create_sequences(X_scaled, y_scaled)
 
         close_times = df_for_sequences["Close time"].values
-        target_times = close_times[self.seq_length:]
+        target_times = close_times[self.sequence_length:]
 
         mask = target_times > from_timestamp
         X_seq = X_seq[mask]

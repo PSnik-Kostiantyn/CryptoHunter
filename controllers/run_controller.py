@@ -10,22 +10,22 @@ if __name__ == "__main__":
     forecaster.build_or_load_model()
     forecaster.evaluate_model()
     timestamp_from = update_btc_dataset()
-    # future = forecaster.forecast(steps=12)
+    future = forecaster.forecast(steps=24)
     forecaster.train_model_on_new_data(timestamp_from)
     forecaster.evaluate_model()
 
-    # for item in future:
-    #     print(item)
-    #
-    # timestamps = [pd.to_datetime(item["timestamp"], unit='s') for item in future]
-    # prices = [item["close"] for item in future]
-    #
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(timestamps, prices, marker='o', linestyle='-', color='b', label='Прогноз ціни BTC')
-    # plt.xlabel('Дата і час')
-    # plt.ylabel('Ціна закриття BTC')
-    # plt.title(f'Прогноз ціни BTC на {len(future)} годин вперед')
-    # plt.legend()
-    # plt.grid()
-    # plt.tight_layout()
-    # plt.show()
+    for item in future:
+        print(item)
+
+    timestamps = [pd.to_datetime(item["timestamp"], unit='s') for item in future]
+    prices = [item["close"] for item in future]
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(timestamps, prices, marker='o', linestyle='-', color='b', label='Прогноз ціни BTC')
+    plt.xlabel('Дата і час')
+    plt.ylabel('Ціна закриття BTC')
+    plt.title(f'Прогноз ціни BTC на {len(future)} годин вперед')
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
