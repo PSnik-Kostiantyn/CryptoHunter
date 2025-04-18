@@ -130,22 +130,22 @@ class BTCPriceForecaster:
         print("\nEvaluating on test set...")
         self.model.eval()
         predictions = []
-        actuals = []
+        actual = []
 
         with torch.no_grad():
             for X_batch, y_batch in self.test_loader:
                 X_batch = X_batch.to(self.device)
                 output = self.model(X_batch).cpu().detach().numpy().reshape(-1)
                 predictions.extend(output)
-                actuals.extend(y_batch.cpu().numpy().reshape(-1))
+                actual.extend(y_batch.cpu().numpy().reshape(-1))
 
         predictions = self.scaler_y.inverse_transform(np.array(predictions).reshape(-1, 1))
-        actuals = self.scaler_y.inverse_transform(np.array(actuals).reshape(-1, 1))
+        actual = self.scaler_y.inverse_transform(np.array(actual).reshape(-1, 1))
 
-        mae = mean_absolute_error(actuals, predictions)
-        mse = mean_squared_error(actuals, predictions)
+        mae = mean_absolute_error(actual, predictions)
+        mse = mean_squared_error(actual, predictions)
         rmse = np.sqrt(mse)
-        rel_error = np.mean(np.abs(predictions - actuals) / actuals) * 100
+        rel_error = np.mean(np.abs(predictions - actual) / actual) * 100
 
         print(f"MAE: {mae:.2f}")
         print(f"MSE: {mse:.2f}")
@@ -153,7 +153,7 @@ class BTCPriceForecaster:
         print(f"Mean Relative Error: {rel_error:.2f}%")
 
         plt.figure(figsize=(12, 6))
-        plt.plot(actuals, label="Actual", color='orange')
+        plt.plot(actual, label="Actual", color='orange')
         plt.plot(predictions, label="Predicted", color='blue')
         plt.title("Model Evaluation on Test Set")
         plt.xlabel("Samples")
@@ -174,12 +174,10 @@ class BTCPriceForecaster:
         self.data = self.data.sort_values("Close time")
 
         X = self.data[self.features].values
-        y = self.data["Close"].values.reshape(-1, 1)
 
         self.scaler_X = MinMaxScaler()
         self.scaler_y = MinMaxScaler()
         X_scaled = self.scaler_X.fit_transform(X)
-        y_scaled = self.scaler_y.fit_transform(y)
 
         last_sequence = X_scaled[-self.sequence_length:]
         last_sequence = last_sequence.copy()
