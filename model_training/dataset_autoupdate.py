@@ -20,8 +20,7 @@ GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemin
 def round_to_hour(ts):
     return ((ts + 3599) // 3600) * 3600
 
-def update_btc_dataset():
-    dataset_path = '../datasets/BTC_ready.csv'
+def update_btc_dataset(dataset_path='../datasets/BTC_ready.csv'):
     print("Завантаження існуючих даних...")
     df = pd.read_csv(dataset_path)
 

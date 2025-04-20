@@ -176,7 +176,7 @@ class BTCPriceForecaster:
         X = self.data[self.features].values
 
         self.scaler_X = MinMaxScaler()
-        self.scaler_y = MinMaxScaler()
+        # self.scaler_y = MinMaxScaler()
         X_scaled = self.scaler_X.fit_transform(X)
 
         last_sequence = X_scaled[-self.sequence_length:]
