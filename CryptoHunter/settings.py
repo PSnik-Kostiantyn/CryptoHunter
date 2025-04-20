@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 import uuid
 from pathlib import Path
+from secrets import token_bytes, token_hex
 
 from dotenv import load_dotenv
 
@@ -25,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', uuid.uuid4().hex)
+SECRET_KEY = os.environ.get('SECRET_KEY') or token_hex(16)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = int(os.environ.get('DEBUG', True))
@@ -42,9 +43,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.admin',
+    'api',
     'rest_framework',
     'drf_standardized_errors',
-    'api.apps.ApiConfig'
+    'django_celery_beat'
 ]
 
 MIDDLEWARE = [
@@ -155,4 +158,7 @@ PREDICTIONS_CACHE_KEY = 'predictions'
 PREDICTIONS_CACHE_TIMEOUT = 3300 # Almost hour
 
 DATASET_PATH = "datasets/BTC_ready.csv"
+NEWS_PATH = "datasets/news.json"
 MODEL_PATH = "models/transformer_model.pth"
+
+REPORTER_SERVER_URL = os.environ.get('REPORTER_SERVER_URL')

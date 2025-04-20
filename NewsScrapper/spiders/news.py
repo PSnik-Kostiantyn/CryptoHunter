@@ -22,9 +22,9 @@ class NewsSpider(scrapy.Spider):
         }
     }
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        df = pd.read_json("../datasets/news.json")
+    def __init__(self, *args, dataset_path="../datasets/news.json", **kwargs) -> None:
+        super().__init__(*args, dataset_path=dataset_path, **kwargs)
+        df = pd.read_json(dataset_path)
         self.start_urls = [
             f"{self.base_url}publishedSince={df['published_at'].max().to_pydatetime().strftime("%Y-%m-%dT%H:%M:%SZ")}&publishedUntil={datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")}"
         ]
