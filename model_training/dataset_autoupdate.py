@@ -20,8 +20,7 @@ GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemin
 def round_to_hour(ts):
     return ((ts + 3599) // 3600) * 3600
 
-def update_btc_dataset():
-    dataset_path = '../datasets/BTC_ready.csv'
+def update_btc_dataset(dataset_path='../datasets/BTC_ready.csv', news_path='../datasets/news.json'):
     print("Завантаження існуючих даних...")
     df = pd.read_csv(dataset_path)
 
@@ -66,7 +65,7 @@ def update_btc_dataset():
             open_time = int(candle[0]) // 1000
             close_time = round_to_hour(int(candle[6]) // 1000)
 
-            score = analyze_news_by_data(open_time)
+            score = analyze_news_by_data(open_time, dataset_path, news_path)
             requests_sent += 1
 
             row = {
@@ -116,12 +115,12 @@ def update_btc_dataset():
     print(return_timestamp)
     return return_timestamp
 
-def get_news_for_certain_hour(unix_timestamp):
+def get_news_for_certain_hour(unix_timestamp, dataset_path='../datasets/news.json'):
     target_time = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
     next_hour = target_time + timedelta(hours=1)
 
     try:
-        with open('../datasets/news.json', 'r', encoding='utf-8') as f:
+        with open(dataset_path, 'r', encoding='utf-8') as f:
             news_dataset = json.load(f)
     except Exception as e:
         print(f"Помилка при читанні файлу: {e}")
@@ -178,16 +177,16 @@ def get_previous_score(unix_timestamp, dataset_path='../datasets/BTC_ready.csv')
         return 0.5
     return df.sort_values("timestamp").iloc[-1]["Score"]
 
-def analyze_news_by_data(unix_timestamp):
-    news_items = get_news_for_certain_hour(unix_timestamp)
+def analyze_news_by_data(unix_timestamp, dataset_path, news_path):
+    news_items = get_news_for_certain_hour(unix_timestamp, news_path)
     if news_items is None:
-        return get_previous_score(unix_timestamp)
+        return get_previous_score(unix_timestamp, dataset_path)
 
     score = analyze_market_reaction(news_items)
     if score is None:
         time.sleep(2)
         score = analyze_market_reaction(news_items, gemini_api=f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}")
     if score is None:
-        return get_previous_score(unix_timestamp)
+        return get_previous_score(unix_timestamp, dataset_path)
     return score
 

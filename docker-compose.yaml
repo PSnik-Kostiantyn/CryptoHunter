@@ -1,0 +1,60 @@
+services:
+  backend:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    env_file: ".env"
+    command: bash -c "
+      poetry run python manage.py migrate
+      && poetry run python manage.py collectstatic --noinput
+      && poetry run python -m gunicorn CryptoHunter.asgi:application --bind 0.0.0.0:8000 --workers 4 -k uvicorn_worker.UvicornWorker
+      "
+    environment:
+      - DEBUG=0
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CHANNELS_REDIS_URL=redis://redis:6379/1
+    volumes:
+      - ./static:/app/static
+  postgres:
+    image: postgres:latest
+    env_file: ".env"
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data/pgdata
+    restart: unless-stopped
+    tty: true
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  celery:
+    build: .
+    command: poetry run celery -A CryptoHunter worker --loglevel=info
+    env_file: ".env"
+    environment:
+      - DEBUG=0
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CHANNELS_REDIS_URL=redis://redis:6379/1
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_started
+  redis:
+    image: "redis:alpine"
+volumes:
+  pgdata:
+    driver: local
