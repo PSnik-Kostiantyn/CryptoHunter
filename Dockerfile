@@ -13,6 +13,6 @@ RUN pip install poetry
 WORKDIR /app
 COPY . .
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --only main
+RUN poetry install --only main --no-root
 
 EXPOSE 8000
