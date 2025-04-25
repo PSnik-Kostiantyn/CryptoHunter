@@ -30,7 +30,8 @@ dependencies = [
     "celery (>=5.5.1,<6.0.0)",
     "psycopg2-binary (>=2.9.10,<3.0.0)",
     "django-celery-beat (>=2.8.0,<3.0.0)",
-    "pycryptodome (>=3.22.0,<4.0.0)"
+    "pycryptodome (>=3.22.0,<4.0.0)",
+    "torch (>=2.7.0,<3.0.0)"
 ]
 
 

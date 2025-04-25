@@ -9,7 +9,7 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
-    env_file: ".env"
+    env_file: .env
     command: bash -c "
       poetry run python manage.py migrate
       && poetry run python manage.py collectstatic --noinput
@@ -17,23 +17,26 @@ services:
       "
     environment:
       - DEBUG=0
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
+      - DB_HOST=postgres
+      - DB_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
-      - CHANNELS_REDIS_URL=redis://redis:6379/1
+      - CACHE_LOCATION=redis://redis:6379/1
     volumes:
       - ./static:/app/static
   postgres:
     image: postgres:latest
-    env_file: ".env"
+    env_file: .env
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - ./pgdata:/var/lib/postgresql/data/pgdata
+      - pgdata:/var/lib/postgresql/data/
     restart: unless-stopped
     tty: true
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -44,10 +47,10 @@ services:
     env_file: ".env"
     environment:
       - DEBUG=0
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
+      - DB_HOST=postgres
+      - DB_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
-      - CHANNELS_REDIS_URL=redis://redis:6379/1
+      - CACHE_LOCATION=redis://redis:6379/1
     depends_on:
       backend:
         condition: service_started
@@ -57,4 +60,3 @@ services:
     image: "redis:alpine"
 volumes:
   pgdata:
-    driver: local
