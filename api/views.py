@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.core.cache import cache
 from rest_framework import status
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import Signal
-from api.serializers import PredictionsSerializerOutput, PredictionsSerializerInput,DecryptedSignalsSerializer
+from api.models import Signal, History
+from api.serializers import PredictionsSerializerOutput, PredictionsSerializerInput,DecryptedSignalsSerializer, \
+    HistorySerializer
 from api.tasks import get_model_predictions
 from api.utils import is_locked
 
@@ -56,3 +58,7 @@ class UpdateSignalsAPIView(APIView):
             Signal.objects.bulk_update(update_list, ['if_below'])
 
         return Response({'status': 'OK'})
+
+class HistoryListAPIView(ListAPIView):
+    queryset = History.objects.exclude(real__isnull=True).all()
+    serializer_class = HistorySerializer
