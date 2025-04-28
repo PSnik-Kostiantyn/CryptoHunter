@@ -4,6 +4,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        restart: true
       redis:
         condition: service_started
     ports:
