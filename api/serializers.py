@@ -2,6 +2,7 @@ import json
 
 from rest_framework import serializers
 
+from api.models import History
 from api.utils import encrypt_message, decrypt_message
 
 
@@ -41,3 +42,8 @@ class DecryptedSignalsSerializer(serializers.Serializer):
         iv, ct = instance.get('iv'), instance.get('ct')
         representation['signals'] = list(json.loads(decrypt_message(iv, ct)))
         return representation
+
+class HistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = History
+        fields = ('timestamp', 'predicted', 'real')
