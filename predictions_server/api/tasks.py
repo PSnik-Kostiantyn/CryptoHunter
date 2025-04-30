@@ -59,7 +59,7 @@ def dataset_update():
         History.objects.bulk_create(histories)
         # Notify users
         min_price = min(list(map(lambda item: item.get('close'), future)))
-        signals = Signal.objects.filter(if_below__lt=min_price).order_by("telegram_id")
+        signals = Signal.objects.filter(if_below__gt=min_price).order_by("telegram_id")
         paginator = Paginator(signals, 100)
         for page_num in paginator.page_range:
             page = paginator.page(page_num)

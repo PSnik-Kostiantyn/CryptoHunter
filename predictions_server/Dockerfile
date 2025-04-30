@@ -10,9 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends
 
 RUN pip install poetry
 
+
 WORKDIR /app
-COPY . .
+
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root
+
+COPY . .
 
 EXPOSE 8000

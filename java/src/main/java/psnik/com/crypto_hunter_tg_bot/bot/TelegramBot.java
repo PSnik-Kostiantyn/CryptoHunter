@@ -176,15 +176,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public void sendUserSignals (EncryptedData userData) throws Exception {
+    public void sendUserSignals(EncryptedData userData) throws Exception {
         String decryptedUserData = aesEncryptionService.decryptData(userData.getIv(), userData.getCt());
         System.out.println(decryptedUserData);
+
         ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode rootArrayNode = objectMapper.readTree(decryptedUserData);
 
-        JsonNode rootNode = objectMapper.readTree(decryptedUserData);
-        JsonNode signalsNode = rootNode.path("signals");
-
-        for (JsonNode signal : signalsNode) {
+        for (JsonNode signal : rootArrayNode) {
             String telegramId = signal.path("telegram_id").asText();
             String ifBelow = signal.path("if_below").asText();
             String messageText = String.format("In the next 24 hours, Bitcoin is expected to fall below %s. 📉 Please note that this is highly uncertain and not financial advice. Good luck! 🚀", ifBelow);

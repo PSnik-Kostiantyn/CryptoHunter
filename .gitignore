@@ -178,3 +178,5 @@ cython_debug/
 
 */news.json
 */scores.json
+
+static

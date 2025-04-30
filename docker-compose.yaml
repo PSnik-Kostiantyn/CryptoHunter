@@ -1,6 +1,6 @@
 services:
   backend:
-    build: .
+    build: ./predictions_server
     depends_on:
       postgres:
         condition: service_healthy
@@ -9,6 +9,8 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
+    expose:
+      - "8000"
     env_file: .env
     command: bash -c "
       poetry run python manage.py migrate
@@ -21,8 +23,10 @@ services:
       - DB_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CACHE_LOCATION=redis://redis:6379/1
+      - REPORTER_SERVER_URL = http://java:8001/receive
     volumes:
-      - ./static:/app/static
+      - ./predictions_server/static:/app/static
+      - ./predictions_server/datasets:/app/datasets
   postgres:
     image: postgres:latest
     env_file: .env
@@ -42,7 +46,7 @@ services:
       start_period: 30s
       timeout: 10s
   celery:
-    build: .
+    build: ./predictions_server
     command: poetry run celery -A CryptoHunter worker --loglevel=info
     env_file: ".env"
     environment:
@@ -51,12 +55,29 @@ services:
       - DB_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CACHE_LOCATION=redis://redis:6379/1
+      - REPORTER_SERVER_URL = http://java:8001/receive
     depends_on:
       backend:
         condition: service_started
       redis:
         condition: service_started
+    volumes:
+      - ./predictions_server/datasets:/app/datasets
   redis:
     image: "redis:alpine"
+  java:
+    build: ./java
+    env_file: ".env"
+    environment:
+      - PYTHON_SERVER = http://backend:8000/update-signals
+      - SPRING_APPLICATION_NAME=${SPRING_APPLICATION_NAME}
+      - BOT_NAME=${BOT_NAME}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - SERVER_PORT=${SERVER_PORT}
+      - SECRET_KEY=${SECRET_KEY}
+    expose:
+      - "8001"
+    ports:
+      - "8001:8001"
 volumes:
   pgdata:
