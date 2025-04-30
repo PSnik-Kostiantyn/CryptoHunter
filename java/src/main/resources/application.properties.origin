@@ -1,6 +1,0 @@
-spring.application.name=crypto_hunter_tg_bot
-bot.name=Crypto Hunter
-bot.token=
-server.port =
-secret.key =
-python.server =
