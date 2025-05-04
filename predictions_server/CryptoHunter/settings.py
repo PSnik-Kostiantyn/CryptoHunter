@@ -47,17 +47,19 @@ INSTALLED_APPS = [
     'api',
     'rest_framework',
     'drf_standardized_errors',
-    'django_celery_beat'
+    'django_celery_beat',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware'
 ]
 
 ROOT_URLCONF = 'CryptoHunter.urls'
@@ -163,3 +165,7 @@ REPORTER_SERVER_URL = os.environ.get('REPORTER_SERVER_URL')
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = '/static/'
+
+ALLOWED_HOSTS = ['localhost']
+
+CORS_ALLOW_ALL_ORIGINS = True
