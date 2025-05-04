@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoHunter</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script> 
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  <script src="js/script.js" defer></script>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header>
+          <div class="logo-auth">
+            <div class="logo">
+              <img src="icons/web/android-chrome-192x192.png" alt="Logo">
+              <h1>CryptoHunter</h1>
+            </div>
+            <div class="auth-links">
+              <a href="#">Log in</a> | <a href="#">Sign up</a>
+            </div>
+          </div>
+        </header>
+    
+        <nav class="crypto-tabs">
+          <button data-coin="Bitcoin">₿ Bitcoin</button>
+          <button data-coin="Ethereum">◊ Ethereum</button>
+          <button data-coin="TonCoin">💎 TonCoin</button>
+          <button data-coin="Solana">🟣 Solana</button>
+        </nav>
+        
+        <div class="main">
+          
+            <section class="prices">
+              <span>Current price: <strong id="currentPrice">Loading...</strong></span>
+              <span>Price in 1 hour: <strong class="green" id="price1Hour">Loading...</strong></span>
+              <span>Price in 24 hour: <strong class="red" id="price24Hour">Loading...</strong></span>
+            </section>
+        
+            <section class="chart-container">
+              <div class="chart-wrapper">
+                <div id="candleDetails" class="details-panel" style="margin-top: 10px; font-family: monospace;"></div>
+                <div class="chart-header">
+                  <h2 id="chartTitle">BTC/USD 24H ⬇</h2>
+                  <button id="settingsToggle">⋯</button>
+                </div>
+              </div>
+            </section>
+        
+            <div class="settings-panel" id="settingsPanel">
+              <label><input type="checkbox" id="forecastCheckbox"> Show forecast</label>
+              <label><input type="checkbox" id="changeColorCheckbox"> Change colors</label>
+              <label><input type="checkbox" id="deactivateLinesCheckbox"> Deactivate lines</label>
+            </div>
+
+            <section class="chart-container" id="forecastSection" style="display: none;">
+              <canvas id="forecastChart" width="800 px" height="400 px"></canvas>
+            </section>
+
+            <section class="telegram-login">
+              <p>Log in to get notifications about accurate forecast on Bitcoin’s price movement</p>
+              <button class="telegram-btn"><a class="telegram-btn-silka" target="_blank" href="https://t.me/crypto_hunter_new_bot">🔷 Log in with Telegram</a></button>
+            </section>
+        
+            <section class="model-info">
+              <h3>How reliable is the model?</h3>
+              <ul>
+                <li>✅ 87% movement directions forecasted correctly</li>
+                <li>✅ Total MSE is only 13.15</li>
+                <li>✅ Hourly data & news updates are improving the model constantly</li>
+              </ul>
+              <section class="chart-container" id="forecastSection">
+                <canvas id="forecastHistoryChart" width="800 px" height="400 px"></canvas>
+              </section>
+              <p class="model-desc">
+                  Model is created with a use of a cutting age LSTM model and so many interesting things about the model
+                  please buy it right now because i am starting and i need money to feed my family please do something for me 
+                  i need to earn with my own model. So that's the models description.
+                </p>
+            </section>
+
+        </div>
+    
+        <footer>
+          <p>About authors About authors About authors About authors About authors</p>
+        </footer>
+    
+    </div>
+</body>
+</html>  
